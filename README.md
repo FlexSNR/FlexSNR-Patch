@@ -49,7 +49,7 @@ _Note: GO should be installed under `/user/local`._
     $ sudo apt-get install -y build-essential fabric git wget
     $ sudo apt-get install -y libnl-3-200 libnl-genl-3-200
     $ wget https://storage.googleapis.com/golang/go1.5.3.linux-amd64.tar.gz
-    $ tar -C /usr/local -xzf go1.5.3.linux-amd64.tar.gz
+    $ sudo tar -C /usr/local -xzf go1.5.3.linux-amd64.tar.gz
     ```
 3. **Download source code**
 
