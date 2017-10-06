@@ -39,12 +39,19 @@ _Note: GO should be installed under `/user/local`._
 #### Setup Environment
 1. **Install git-lfs**
     ```
-    $ curl -s https://packagecloud.io/install/repositories/github/git-lfs/.deb.sh | sudo bash
+    $ curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
     $ sudo apt-get install git-lfs
+    $ git lfs install
     ```
     Check [git-lfs] if you are failed to install git-lfs.
-
-2. **Download source code**
+2. **Install go and fabric**
+    ```
+    $ sudo apt-get install -y build-essential fabric git wget
+    $ sudo apt-get install -y libnl-3-200 libnl-genl-3-200
+    $ wget https://storage.googleapis.com/golang/go1.5.3.linux-amd64.tar.gz
+    $ tar -C /usr/local -xzf go1.5.3.linux-amd64.tar.gz
+    ```
+3. **Download source code**
 
     Change to directory you want to use for downloading source code. The directory will be `[SrcHome]` for configuration in next section.
     ```
@@ -54,7 +61,7 @@ _Note: GO should be installed under `/user/local`._
     ```
     Type *`FlexSNR`* where asking Git username, and press enter for others.
 
-3. **Configure environment variable**
+4. **Configure environment variable**
     ```
     $ export PATH=$PATH:/usr/local/go/bin
     $ export SR_CODE_BASE=[SrcHome]
@@ -124,7 +131,7 @@ root      4171  0.0  1.8 1040620 145860 ?      S    02:07   0:00 /opt/flexswitch
 root     14979  0.0  0.0  12732  2148 pts/3    S+   06:55   0:00 grep flex
 ```
 ### Test Flexswitch
-Refererence Site:
+Reference Site:
 1. [OPX Flx document]
 2. [Snaproute Flexswitch document]
 ## License
