@@ -1,0 +1,13 @@
+{
+    "build": "171", 
+    "changeindex": "44", 
+    "major": "1", 
+    "minor": "0", 
+    "patch": "0", 
+    "platforms": [
+        {
+            "odm": "ingrasys_s9100",
+            "platform": "onlp"
+        }
+    ]
+}

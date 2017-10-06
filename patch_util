@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Contant
+SR_BIN_ASICDBCM_BASE=$SR_CODE_BASE/snaproute/src/bin-AsicdBcm
+SR_ASICD_CODE_BASE=$SR_CODE_BASE/snaproute/src/asicd
+
+# color definition
+### Green ###
+COLOR_TITLE="\e[1;32m"
+### Yellow ###
+COLOR_WARNING="\e[1;33m"
+### END ###
+COLOR_END="\e[0m"
+
+dtime="[$(date +'%Y-%m-%d %H:%M:%S')]"
+LOG="echo $dtime "
+
+
+function _patch_snaproute {
+    $LOG "==============================================================="
+    $LOG "# Description: Add platform information"
+    $LOG "==============================================================="
+
+    rm $SR_CODE_BASE/snaproute/src/l3/dhcp_relay/ -rf
+    cp -rf OpenSnaproute/* $SR_CODE_BASE/
+}
+
+function _fetch_asicd {
+    $LOG "==============================================================="
+    $LOG "# Description: Fetch asicd"
+    $LOG "==============================================================="
+
+    git clone https://github.com/FlexSNR/asicdopen.git
+    RESULT=$?
+    if [ $RESULT -ne 0 ]; then
+        $LOG "Fail to fetch code from github. Please check your Internet connection"
+        exit 1
+    fi
+}
+
+function _patch_asicd {
+    $LOG "==============================================================="
+    $LOG "# Description: Patch asicd"
+    $LOG "==============================================================="
+
+    rm -fr $SR_ASICD_CODE_BASE
+    cp -r asicdopen $SR_ASICD_CODE_BASE
+}
+
+function _copy_opennsl {
+    $LOG "==============================================================="
+    $LOG "# Description: Copy kernel module & opennsl library/header"
+    $LOG "==============================================================="
+
+    cp -r bin-AsicdBcm/* $SR_BIN_ASICDBCM_BASE/
+    if [ ! -d $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/opennsl ]; then
+        mkdir -p $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/opennsl
+    fi
+    cp -r opennsl/include $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/opennsl/
+
+    ln -sf $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/lib/libopennsl.so.1 $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/lib/libopennsl.so
+}
+
+function _copy_sai {
+    $LOG "==============================================================="
+    $LOG "# Description: Copy sai library/header"
+    $LOG "==============================================================="
+
+    cp -r bin-AsicdBcm/* $SR_BIN_ASICDBCM_BASE/
+    if [ ! -d $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/sai ]; then
+        mkdir -p $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/sai
+    fi
+    cp -r sai/include $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/sai/
+
+    ln -sf $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/lib/libsai.so.1.0 $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/lib/libsai.so
+    ln -sf $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/lib/libsai.so.1.0 $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/lib/libsai.so.1
+    _copy_opennsl
+}
+
+
+function _main {
+    if [ "$SR_CODE_BASE" = "" ]; then
+        $LOG "Check you export SR_CODE_BASE"
+        exit 1
+    fi
+    echo "Code Base: $SR_CODE_BASE"
+    _fetch_asicd
+    _patch_snaproute
+    _patch_asicd
+    _copy_sai
+}
+
+_main
+
+exit 0

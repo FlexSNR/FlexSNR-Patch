@@ -1,0 +1,58 @@
+[
+	{"Name": "asicd",
+	 "Port": 10000},
+
+	{"Name": "bgpd",
+	 "Port": 10001},
+
+	{"Name":"ribd",  
+	 "Port":10002},
+	
+	{"Name":"arpd", 
+	 "Port":10003},
+		
+	{"Name":"lacpd",
+	 "Port":10004},
+
+    {"Name":"ospfv2d",
+     "Port":10005},
+
+	{"Name":"stpd",
+	 "Port":10006},
+
+	{"Name":"dhcprelayd",
+	 "Port": 10007},
+
+	{"Name":"bfdd",
+	 "Port":10008},
+
+	{"Name":"vrrpd",
+	 "Port":10009},
+
+	{"Name":"sysd",
+	 "Port":10010},
+	
+	{"Name":"lldpd",
+	 "Port":10011},
+	
+	{"Name":"dhcpd",
+	 "Port":10013},
+	
+	{"Name":"fMgrd",
+	 "Port":10014},
+	
+    {"Name":"vxland",
+	 "Port":10015},
+
+    {"Name":"platformd",
+	 "Port":10016},
+	 
+    {"Name":"ndpd",
+	 "Port":10017},
+
+    {"Name":"notifierd",
+	 "Port":10019},
+
+    {"Name":"local",
+	 "Port":0}
+]

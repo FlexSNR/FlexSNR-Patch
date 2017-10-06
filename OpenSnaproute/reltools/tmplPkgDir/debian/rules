@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(SR_CODE_BASE)/snaproute/src/bin-AsicdBcm/ingrasys_s9100/lib/ --dpkg-shlibdeps-params=--ignore-missing-info
+
+binary:
+	dh binary --before dh_strip
+	dh binary --after dh_strip

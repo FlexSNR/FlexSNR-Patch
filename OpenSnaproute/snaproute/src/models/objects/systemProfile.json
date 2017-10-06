@@ -1,0 +1,40 @@
+{
+"Daemons" : [
+            {"Name": "bgpd",
+            "Enable": true},
+
+            {"Name":"lacpd",
+            "Enable": true},
+
+            {"Name":"ospfd",
+            "Enable": true},
+
+            {"Name":"stpd",
+            "Enable": true},
+
+            {"Name":"dhcprelayd",
+            "Enable": true},
+
+            {"Name":"bfdd",
+            "Enable": true},
+
+            {"Name":"vrrpd",
+            "Enable": true},
+
+            {"Name":"lldpd",
+            "Enable": true},
+
+            {"Name":"vxland",
+            "Enable": true}
+            ],
+"TCPPortBase" : 10000,
+"API_Port"    : 8080,
+"Notifier_Port" : 8081,
+"SwitchMac": "9a:ed:e6:c2:27:67",
+"MgmtIp"   : "10.1.10.244",
+"Description" : "FlexSwitch System",
+"Version" : "1.0.0",
+"HostName" : "FLEXSWITCH",
+"Vrf": "default"
+}
+

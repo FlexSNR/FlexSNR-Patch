@@ -1,0 +1,453 @@
+#!/usr/bin/env python
+import os
+import signal
+import sys
+import time
+import daemon
+import datetime
+import re
+import json
+import subprocess
+import socket
+from optparse import OptionParser
+import syslog
+
+ASICD_CONF_FILE = '/opt/flexswitch/params/asicdConf.json'
+SYS_PROFILE = '/opt/flexswitch/params/systemProfile.json'
+
+#Constants specific to ACC_5812, used to reset external XGPHY before SDK is initialized
+ACC_5812_PLT_NAME = 'x86-64-accton-as5812-54t-r0'
+INGRA_S9100_PLT_NAME = 'x86-64-ingrasys-s9100-32x-r0'
+ONL_PLT_FILE_LOC = '/etc/onl/platform'
+DMN_CLEANUP_TIME = 3
+DMN_KILL_COUNT = 5
+
+HEADER = '\033[95m'
+OKBLUE = '\033[94m'
+OKGREEN = '\033[92m'
+WARNING = '\033[93m'
+FAIL = '\033[91m'
+ENDC = '\033[0m'
+BOLD = '\033[1m'
+UNDERLINE = '\033[4m'
+
+def execPlatPrereq():
+    as5812_cmdList = [
+        'i2cset -y -f 0 0x60 0x5 0x0f b',
+        'i2cset -y -f 0 0x60 0x6 0xff b'
+    ]
+
+    ingra_s9100_cmdList = [
+        'i2cset -y -r -f 0 0x33 0x34 0x10'
+    ]
+
+    plt_5812 = False
+    plt_ingrasys_s9100 = False
+    cmdList = []
+    try:
+        with open(ONL_PLT_FILE_LOC, 'r') as fp:
+            for line in fp:
+                if ACC_5812_PLT_NAME in line:
+                    plt_5812 = True
+                    cmdList = as5812_cmdList
+                if INGRA_S9100_PLT_NAME in line:
+                    plt_ingrasys_s9100 = True
+                    cmdList = ingra_s9100_cmdLis
+            if plt_5812 or plt_ingrasys_s9100:
+                print 'DeAsserting XGPHY reset on platform'
+                for cmd in cmdList:
+                    process = subprocess.Popen(cmd,
+                                               shell=True,
+                                               stdout=subprocess.PIPE,
+                                               stderr=subprocess.PIPE)
+                    out, err = process.communicate()
+                    if err:
+                        print "i2cset command failed", cmd, err
+
+    except:
+        print 'No platform prereq'
+
+
+def determineMacAddress():
+    print 'Getting MAC address and Mgmt Ip address'
+    process = subprocess.Popen('ifconfig -a',
+                               shell=True,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    errcode = process.returncode
+    macAddrList = []
+    macAddrCopy = []
+    portCopy = []
+    for line in out.split('\n'):
+        if re.search('HWaddr', line):
+           addr = line.partition('HWaddr')[-1].strip(' ')
+           port = line.split()[0]
+           if addr not in macAddrCopy and not (port.startswith('ip6tnl') or port.startswith('SVI') or port.startswith('bcm') or port.startswith('fpPort') or port.startswith('dummy') or port.startswith('bond') or port.startswith('ifb')):
+               macAddrList.append((port, addr))
+               macAddrCopy.append(addr)
+
+    chosenMac = macAddrList[0][1]
+    newMac = '%x' %(int(chosenMac.replace(':',''), 16))
+    returnMac = int(newMac, 16) +1
+    returnMacStr = '%x' %(returnMac)
+    returnMacStr = '%s' %(returnMacStr.zfill(12))
+    resultMacStr = ''.join([c+':' if i%2 and i <len(returnMacStr)-1 else c for i,c in enumerate(returnMacStr)])
+
+    for line in out.split('\n'):
+        if re.search('inet addr', line):
+           port = line.split()[0]
+	   ip_addr_info = line.partition('inet addr')[-1].strip(':')
+           if port not in portCopy and not (port.startswith('SVI') or port.startswith('bcm') or port.startswith('fpPort') or port.startswith('lo') or port.startswith('Lo')):
+	        ip_addr = ip_addr_info.split()[0]
+		portCopy.append(port)
+
+    if os.path.isfile(ASICD_CONF_FILE) :
+        with open(ASICD_CONF_FILE, 'r') as fileHdl:
+            confData = json.load(fileHdl)
+            confData['SwitchMac'] = resultMacStr
+        with open(ASICD_CONF_FILE, 'w') as fileHdl:
+            json.dump(confData, fileHdl,  indent=2)
+    if os.path.isfile(SYS_PROFILE):
+        with open(SYS_PROFILE, 'r') as fileHdl:
+            confData = json.load(fileHdl)
+            confData['MgmtIp'] = ip_addr
+            confData['SwitchMac'] = resultMacStr
+            confData['RouterId'] = "0.0.0.0"
+            confData['HostName'] = socket.gethostname()
+        with open(SYS_PROFILE, 'w') as fileHdl:
+            json.dump(confData, fileHdl, indent=2)
+
+
+def isPIdFileExisting(pidFile):
+    processId = 0
+    try:
+        fp = file(pidFile, "r")
+        processId = int(fp.read().strip())
+        fp.close()
+        if os.path.exists('/proc/%d' % processId):
+            pass
+        else:
+            processId = 0
+    except IOError:
+        processId = 0
+    return (processId != 0)
+
+
+def isProcessRunning(pid, pidFile):
+    isRunning = True
+    try:
+        # Check if process matching pid file is running
+        os.kill(pid, 0)
+    except:
+        # Process with pid not running, cleanup pid file
+        if os.path.isfile(pidFile):
+            os.remove(pidFile)
+        isRunning = False
+    return isRunning
+
+def getProcessState(pid):
+    try :
+        os.kill(pid, 0)
+        return True
+    except:
+        return False
+
+def getPidInfo(pidFileDir, dmn):
+    pid = 0
+    pidFile = pidFileDir + dmn['name'] + '.pid'
+    try:
+        if os.path.exists(pidFile):
+            pf = file(pidFile, 'r')
+            pid = int(pf.read().strip())
+            pf.close()
+    except:
+        pid = 0
+    return pid, pidFile
+
+
+def checkAllDaemons(baseDir):
+    pidFileDir = baseDir + '/bin/pids/'
+    allDmns = getDaemonsInfo(baseDir, False)
+    for dmn in allDmns:
+        pid, pidFile = getPidInfo(pidFileDir, dmn)
+        if pid == 0:
+            return False
+    return True
+
+def getDaemonsInfo (baseDir, selectedDmns = True) :
+
+    daemonsList = [
+        {'name': 'sysd',
+         'runlevel': 0,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'asicd',
+         'runlevel': 1,
+         'params': '-params=' + baseDir + '/params'},
+
+        #                    {'name': 'opticd',
+        #                     'runlevel' : 2,
+        #                     'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'lacpd',
+         'runlevel': 3,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'stpd',
+         'runlevel': 4,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'lldpd',
+         'runlevel': 5,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'arpd',
+         'runlevel': 6,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'ribd',
+         'runlevel': 7,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'bfdd',
+         'runlevel': 8,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'bgpd',
+         'runlevel': 9,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'ospfv2d',
+         'runlevel': 10,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'dhcpd',
+         'runlevel': 11,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'dhcprelayd',
+         'runlevel': 12,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'vrrpd',
+         'runlevel': 13,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'vxland',
+         'runlevel': 14,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'ndpd',
+         'runlevel': 15,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'platformd',
+         'runlevel': 16,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'fMgrd',
+         'runlevel': 17,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'notifierd',
+         'runlevel': 18,
+         'params': '-params=' + baseDir + '/params'},
+
+        {'name': 'confd',
+         'runlevel': 19,
+         'params': '-params=' + baseDir + '/params'},
+    ]
+
+    disabledDaemons = []
+    daemonsToStart = []
+    with open(SYS_PROFILE) as fd:
+        sysCfg = json.load(fd)
+        dmnsInfo = sysCfg['Daemons']
+        disabledDaemons = [dmn['Name']
+                           for dmn in dmnsInfo if not dmn['Enable']]
+
+    for dmn in daemonsList:
+        if not selectedDmns or dmn['name'] not in disabledDaemons:
+            daemonsToStart.append(dmn)
+
+    return daemonsToStart
+
+
+class FlexSwitchDaemon (daemon.Daemon):
+
+    def run(self, *args, **kwargs):
+        cmd = args[0][0]
+        if type(args[0][1]) == list:
+            pargs = args[0][1]
+        else:
+            pargs = args[0]
+
+        os.execvp(cmd, pargs)
+
+
+if __name__ == "__main__":
+    parser = OptionParser()
+
+    parser.add_option("-d", "--dir",
+                      dest="directory",
+                      action='store',
+                      help="Directory where the binaries are stored")
+
+    parser.add_option("-o", "--op",
+                      dest="op",
+                      default="start",
+                      action='store',
+                      help="Operation (start/stop) ")
+
+    parser.add_option("-b", "--boot",
+                      dest="boot",
+                      action='store',
+                      help="Type of subsequent boot operation (cold/warm) ")
+
+    parser.add_option("-n", "--name",
+                      dest="name",
+                      action='store',
+                      help="Daemon name")
+
+    (opts, args) = parser.parse_args()
+    localBld = False
+    if opts.directory != None:
+        localBld = True
+        baseDir = opts.directory
+    else:
+        baseDir = "/opt/flexswitch"
+
+    if opts.op != None and opts.op not in ['start', 'stop', 'status']:
+        parser.print_usage()
+        sys.exit(0)
+
+    if opts.boot != None and opts.boot not in ['cold', 'warm']:
+        parser.print_usage()
+        sys.exit(0)
+
+    if opts.op != 'stop' and opts.boot != None:
+        parser.print_usage()
+        sys.exit(0)
+
+    if opts.name != None and opts.op not in ['start', 'stop']:
+        parser.print_usage()
+        sys.exit(0)
+
+    if not localBld and opts.op == 'start':
+        determineMacAddress()
+    else:
+        SYS_PROFILE = baseDir + '/params/systemProfile.json'
+    pidFileDir = baseDir + '/bin/pids/'
+    asicdBootModeFile = baseDir + '/params/asicdBootMode.conf'
+    if opts.boot != None and opts.boot == 'cold':
+        asicdBootMode = '0'
+    else:
+        asicdBootMode = '0'  # FIXME:Change this to 1, when we start supporting restart on all apps
+
+    if opts.op == 'start':
+        syslog.syslog(syslog.LOG_DEBUG, '#### Flex Switch Starting')
+        execPlatPrereq()
+        if ((not os.path.exists(pidFileDir))):
+            os.makedirs(pidFileDir)
+
+        start = datetime.datetime.now()
+        dmnCount = 0
+        children = []
+        for dmn in getDaemonsInfo(baseDir):
+            if opts.name != None and opts.name != dmn['name']:
+                continue
+            print "Starting Daemon %s Params: %s" % (dmn['name'], dmn['params'])
+            syslog.syslog(syslog.LOG_DEBUG, 'Starting Daemon %s Params: %s' % (
+                dmn['name'], dmn['params']))
+            dmnCount += 1
+            pidFile = pidFileDir + dmn['name'] + '.pid'
+            if isPIdFileExisting(pidFile):
+                syslog.syslog(syslog.LOG_DEBUG,
+                              'process %s is already running' % (dmn['name']))
+            else:
+                cmd = baseDir +'/bin/'+ dmn['name']
+                pargs = (cmd, dmn['params'])
+                time.sleep(0.02)
+                pid = os.fork()
+                if pid == 0:
+                    dmnInst = FlexSwitchDaemon (pidFile,
+                                            #stdout= baseDir+'/bin/'+'log.txt',
+                                            #stderr= baseDir+'/bin/'+'log.txt',
+                                            stdout = '/var/log/syslog',
+                                            stderr = '/var/log/syslog',
+                                            #stderr= baseDir+'/bin/'+'log.txt',
+                                            verbose=2)
+                    dmnInst.start(pargs)
+                    print 'process %s is started' %(dmn['name'])
+                else:
+                    children.append(pid)
+        for child in children:
+            os.waitpid(child, 0)
+        end = datetime.datetime.now()
+        print 'Total time taken to start all %s daemons is  %s' %(dmnCount, end -start)
+    elif opts.op == 'status':
+        if checkAllDaemons(baseDir):
+            print '[ ' + OKGREEN + 'ok' + ENDC + ' ] FlexSwitch is running.'
+        else:
+            print '[ ' + FAIL + 'error' + ENDC + ' ] FlexSwitch is not running.'
+        sys.exit(0)
+    elif opts.op == 'stop':
+        allDmns = getDaemonsInfo(baseDir, False)
+        sortedDmns = reversed(sorted(allDmns, key=lambda dmn: dmn['runlevel']))
+
+        for dmn in sortedDmns:
+            if opts.name != None and opts.name != dmn['name']:
+                continue
+            try:
+                print "Stopping Daemon %s" % (dmn['name'])
+                syslog.syslog(syslog.LOG_DEBUG,
+                              'Stoping Daemon %s' % (dmn['name']))
+                pid, pidFile = getPidInfo(pidFileDir, dmn)
+                if pid == 0:
+                    continue
+                if not isProcessRunning(pid, pidFile):
+                    continue
+                # Process matching pid exists, perform cleanup
+                if dmn['name'] == 'asicd':
+                    if os.path.exists(asicdBootModeFile):
+                        os.remove(asicdBootModeFile)
+                    if opts.boot == 'cold':
+                        os.kill(pid, signal.SIGUSR1)
+                    else:
+                        # FIXME:Change this to SIGHUP, when we start supporting
+                        # restart on all apps
+                        os.kill(pid, signal.SIGUSR1)
+                    f = open(asicdBootModeFile, 'w')
+                    f.write(asicdBootMode)
+                    f.close()
+                else:
+                    os.kill(pid, signal.SIGHUP)
+            except:
+                print '*** Failed to stop process [%s]' % (dmn['name'])
+                syslog.syslog(syslog.LOG_DEBUG,
+                              '*** Failed to stop process [%s]' % (dmn['name']))
+        time.sleep(DMN_CLEANUP_TIME)
+        for dmn in getDaemonsInfo(baseDir if not localBld else baseDir + '/bin'):
+            if opts.name != None and opts.name != dmn['name']:
+                continue
+            pid, pidFile = getPidInfo(pidFileDir, dmn)
+            if pid == 0:
+                continue
+            waitCount = DMN_KILL_COUNT
+            while isProcessRunning(pid, pidFile) and waitCount > 0:
+                waitCount -= 1
+                if dmn['name'] == 'asicd':
+                    time.sleep(5)
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except:
+                    pass
+                time.sleep(1)
+            if isProcessRunning(pid, pidFile):
+                print '*** Failed to Kill process [%s]' % (dmn['name'])
+                syslog.syslog(syslog.LOG_DEBUG,
+                              '*** Failed to kill process [%s]' % (dmn['name']))
+        #os.system('ls /opt/flexswitch/bin/pids/')
+        #os.system('cat /opt/flexswitch/bin/pids/*')
+        #os.system('ps fax | grep flex')
