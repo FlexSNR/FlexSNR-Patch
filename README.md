@@ -85,14 +85,15 @@ $ python makePkg.py
 _Note: To build successfully, you need to contact us for asic-related files_
 ## Deployment Guide
 Our FlexSwitch is tested on [Open Network Linux] (ONL). You could follow the process the setup FlexSwitch on your machine.
-### Setup ONIE
+### Install ONIE
 Follow the instruction to install ONIE on your machine.
 
 ONIE Location:
 
 https://github.com/opencomputeproject/onie/tree/master/machine/ingrasys/ingrasys_s9100
-### Setup ONL
+### Install ONL
 ```
+Get image from https://github.com/FlexSNR/bin-ONL
 Install ONL by ONIE.
 ```
 ### Install dependency
@@ -130,7 +131,7 @@ root      4073  0.0  0.2 615540 19256 ?        Sl   02:07   0:04 /opt/flexswitch
 root      4171  0.0  1.8 1040620 145860 ?      S    02:07   0:00 /opt/flexswitch/bin/asicd -params=/opt/flexswitch/params
 root     14979  0.0  0.0  12732  2148 pts/3    S+   06:55   0:00 grep flex
 ```
-### Test Flexswitch
+### Test FlexSwitch
 Reference Site:
 1. [OPX Flx document]
 2. [Snaproute Flexswitch document]
