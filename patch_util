@@ -52,6 +52,9 @@ function _copy_opennsl {
     $LOG "# Description: Copy kernel module & opennsl library/header"
     $LOG "==============================================================="
 
+    if [ ! -d $SR_BIN_ASICDBCM_BASE ]; then
+        mkdir -p $SR_BIN_ASICDBCM_BASE
+    fi
     cp -r bin-AsicdBcm/* $SR_BIN_ASICDBCM_BASE/
     if [ ! -d $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/opennsl ]; then
         mkdir -p $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/opennsl
@@ -66,6 +69,9 @@ function _copy_sai {
     $LOG "# Description: Copy sai library/header"
     $LOG "==============================================================="
 
+    if [ ! -d $SR_BIN_ASICDBCM_BASE ]; then
+        mkdir -p $SR_BIN_ASICDBCM_BASE
+    fi
     cp -r bin-AsicdBcm/* $SR_BIN_ASICDBCM_BASE/
     if [ ! -d $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/sai ]; then
         mkdir -p $SR_BIN_ASICDBCM_BASE/ingrasys_s9100/sai
