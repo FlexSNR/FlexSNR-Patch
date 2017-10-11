@@ -7,12 +7,12 @@ It has open source version on two sites:
   - [OpenSnaproute] (Deprecated)
   - [OpxFlexswitch]
 
-## Network stack support
+## Network Stack Support
 Our patches for FlexSwitch network stack uses open source code released at [OpenSnaproute] to be the stack codebase, and leverage code from [OpxFlexswitch] to fix issues.
 
 _**Note: The code on OpenSnaproute has been removed. We push the original code to the site to be our codebase.**_ 
 
-## Asicd support
+## Asicd Support
 Snaproute's asic daemon serves as a hardware abstraction layer (HAL). Our implementation is based on open source code at [asicdopen]. We complete the SAI plugin implementaion using [SAI API 0.9.4]. We have verified it works on our white box Ingrasys S9100 and S8900 using Broadcom Tomahawk chip.
 
 ## Features
@@ -80,7 +80,7 @@ $ python makePkg.py
 ```
 
 ### Build Ingrasys S9100 version
-Change directory to `[SrcHome]`.
+Change directory to `~/git`.
 ```
 $ git clone https://github.com/FlexSNR/FlexSNR-Patch
 $ cd FlexSNR-Patch
