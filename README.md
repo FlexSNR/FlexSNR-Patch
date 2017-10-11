@@ -33,9 +33,8 @@ You can use the following process to build packages. The deb files could be foun
 
 ### Developing Environment Setup
 #### Prerequisites
-Prepare Ubuntu 14.04, and install GO 1.5.3 on it.
+Prepare Ubuntu 14.04.
 
-_Note: GO should be installed under `/user/local`._
 #### Setup Environment
 1. **Install git-lfs**
     ```
@@ -53,19 +52,26 @@ _Note: GO should be installed under `/user/local`._
     ```
 3. **Download source code**
 
-    Change to directory you want to use for downloading source code. The directory will be `[SrcHome]` for configuration in next section.
+    Change to directory you want to use for downloading source code. You could choose any folder in Home directory. By default, your code will be put into `~/git`.
     ```
     $ git clone https://github.com/FlexSNR/reltools
     $ cd reltools
     $ fab setupDevEnv
     ```
-    Type *`FlexSNR`* where asking Git username, and press enter for others.
+    There should be some interactive questions. Type `FlexSNR` for username, and press enter for others to use default value.
+
+    > Host directory: [git]     
+    > Git username: `FlexSNR`   
+    > Git Protocol (https/ssh): [https]   
+    > SnapRoute Employee (y/n): [n]   
+
+    _Note: If you choose another folder to store source code, replace git by your folder name._
 
 4. **Configure environment variable**
     ```
     $ export PATH=$PATH:/usr/local/go/bin
-    $ export SR_CODE_BASE=[SrcHome]
-    $ export GOPATH=[SrcHome]/snaproute:[SrcHome]/external:[SrcHome]/generated
+    $ export SR_CODE_BASE=~/git
+    $ export GOPATH=~/git/snaproute:~/git/external:~/git/generated
     ```
 
 ### Build docker version
@@ -76,8 +82,8 @@ $ python makePkg.py
 ### Build Ingrasys S9100 version
 Change directory to `[SrcHome]`.
 ```
-$ git clone https://github.com/FlexSNR/patch
-$ cd patch
+$ git clone https://github.com/FlexSNR/FlexSNR-Patch
+$ cd FlexSNR-Patch
 $ ./patch_util
 $ cd ../reltools
 $ python makePkg.py
@@ -86,19 +92,24 @@ _Note: To build successfully, you need to contact us for asic-related files_
 ## Deployment Guide
 Our FlexSwitch is tested on [Open Network Linux] (ONL). You could follow the process the setup FlexSwitch on your machine.
 ### Install ONIE
-Follow the instruction to install ONIE on your machine.
+Follow the instruction to build and install ONIE on your machine.
+
+https://github.com/opencomputeproject/onie/blob/master/machine/ingrasys/ingrasys_s9100/INSTALL
 
 ONIE Location:
 
-https://github.com/opencomputeproject/onie/tree/master/machine/ingrasys/ingrasys_s9100
+https://github.com/opencomputeproject/onie
+
 ### Install ONL
-```
-Get image from https://github.com/FlexSNR/bin-ONL
 Install ONL by ONIE.
-```
+
+ONL installer for our FlexSwitch:
+
+https://github.com/FlexSNR/bin-ONL
+
 ### Install dependency
 ```
-$ apt-get install libjemalloc1, redis-tools, redis-server, libnl-3-200, libnl-genl-3-200
+$ apt-get install libjemalloc1 redis-tools redis-server libnl-3-200 libnl-genl-3-200
 ```
 ### Initialize switch ASIC
 Please contact us.
